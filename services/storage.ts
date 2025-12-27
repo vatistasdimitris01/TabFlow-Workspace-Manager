@@ -1,5 +1,4 @@
-
-import { Session } from '../types';
+import { Session } from '../types.ts';
 
 const STORAGE_KEY = 'tabflow_sessions';
 
