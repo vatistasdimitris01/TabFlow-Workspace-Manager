@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import Sidebar from './components/Sidebar';
-import CanvasWorkspace from './components/CanvasWorkspace';
-import ExtensionDownloader from './components/ExtensionDownloader';
-import { Session, ViewType, Tab } from './types';
-import { storage } from './services/storage';
+import Sidebar from './components/Sidebar.tsx';
+import CanvasWorkspace from './components/CanvasWorkspace.tsx';
+import ExtensionDownloader from './components/ExtensionDownloader.tsx';
+import { Session, ViewType, Tab } from './types.ts';
+import { storage } from './services/storage.ts';
 
 const App: React.FC = () => {
   const [view, setView] = useState<ViewType>('workspace');

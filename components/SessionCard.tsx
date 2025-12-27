@@ -1,6 +1,5 @@
-
 import React, { useState } from 'react';
-import { Session } from '../types';
+import { Session } from '../types.ts';
 
 interface SessionCardProps {
   session: Session;

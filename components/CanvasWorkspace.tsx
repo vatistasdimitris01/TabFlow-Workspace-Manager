@@ -1,6 +1,5 @@
-
 import React, { useState } from 'react';
-import { Session, Tab } from '../types';
+import { Session, Tab } from '../types.ts';
 
 interface CanvasWorkspaceProps {
   sessions: Session[];
@@ -20,6 +19,14 @@ const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
   onRemoveLiveTab 
 }) => {
   const [draggedTab, setDraggedTab] = useState<Tab | null>(null);
+
+  const getHostname = (url: string) => {
+    try {
+      return new URL(url).hostname;
+    } catch {
+      return 'unknown';
+    }
+  };
 
   const handleDragStart = (tab: Tab) => setDraggedTab(tab);
 
@@ -82,11 +89,11 @@ const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
             >
               <div className="flex items-center gap-4">
                 <div className="w-8 h-8 rounded-lg bg-[#0a0c10] flex items-center justify-center border border-white/5 flex-shrink-0">
-                  <img src={`https://www.google.com/s2/favicons?domain=${new URL(tab.url).hostname}&sz=32`} className="w-5 h-5" alt="" />
+                  <img src={`https://www.google.com/s2/favicons?domain=${getHostname(tab.url)}&sz=32`} className="w-5 h-5" alt="" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-bold text-slate-200 truncate">{tab.title}</p>
-                  <p className="text-[10px] text-slate-500 truncate mt-0.5">{new URL(tab.url).hostname}</p>
+                  <p className="text-[10px] text-slate-500 truncate mt-0.5">{getHostname(tab.url)}</p>
                 </div>
               </div>
             </div>
@@ -135,7 +142,7 @@ const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
             <div className="space-y-3 min-h-[140px] flex flex-col">
               {session.tabs.map(tab => (
                 <div key={tab.id} className="flex items-center gap-4 p-3 rounded-2xl bg-[#0a0c10]/40 border border-white/5 hover:bg-white/5 hover:border-white/10 transition-all group/item shadow-sm">
-                  <img src={`https://www.google.com/s2/favicons?domain=${new URL(tab.url).hostname}&sz=32`} className="w-5 h-5 rounded" alt="" />
+                  <img src={`https://www.google.com/s2/favicons?domain=${getHostname(tab.url)}&sz=32`} className="w-5 h-5 rounded" alt="" />
                   <span className="text-[11px] font-bold text-slate-400 truncate flex-1 tracking-tight">{tab.title}</span>
                   <div className="flex gap-2 opacity-0 group-hover/item:opacity-100 transition-opacity">
                     <a href={tab.url} target="_blank" className="text-slate-600 hover:text-blue-400">

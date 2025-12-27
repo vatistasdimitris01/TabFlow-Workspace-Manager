@@ -1,7 +1,6 @@
-
 import React, { useState } from 'react';
-import { Session } from '../types';
-import SessionCard from './SessionCard';
+import { Session } from '../types.ts';
+import SessionCard from './SessionCard.tsx';
 
 interface DashboardProps {
   sessions: Session[];
