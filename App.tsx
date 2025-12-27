@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import Sidebar from './components/Sidebar.tsx';
 import CanvasWorkspace from './components/CanvasWorkspace.tsx';
@@ -11,6 +12,21 @@ const App: React.FC = () => {
   const [liveTabs, setLiveTabs] = useState<Tab[]>([]);
   const [isFetching, setIsFetching] = useState(false);
   const [extensionId, setExtensionId] = useState<string>(localStorage.getItem('tabflow_ext_id') || '');
+  const [isAutoConnected, setIsAutoConnected] = useState(false);
+
+  // Auto-handshake listener
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'TABFLOW_EXTENSION_READY' && event.data?.extensionId) {
+        console.log("Automatic handshake successful with ID:", event.data.extensionId);
+        setExtensionId(event.data.extensionId);
+        setIsAutoConnected(true);
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, []);
 
   useEffect(() => {
     const saved = storage.getSessions();
@@ -22,12 +38,14 @@ const App: React.FC = () => {
   }, [sessions]);
 
   useEffect(() => {
-    localStorage.setItem('tabflow_ext_id', extensionId);
+    if (extensionId) {
+      localStorage.setItem('tabflow_ext_id', extensionId);
+    }
   }, [extensionId]);
 
   const fetchExtensionTabs = async () => {
     if (!extensionId) {
-      alert("Please set your Extension ID in Settings first!");
+      alert("No extension detected. Please install and load the extension first.");
       setView('import-export');
       return;
     }
@@ -40,12 +58,14 @@ const App: React.FC = () => {
           if (response && response.tabs) {
             setLiveTabs(response.tabs);
           } else {
-            alert("Could not connect to extension. Make sure ID is correct and extension is loaded.");
+            console.warn("Connection attempt failed, likely incorrect ID or extension not active.");
+            setIsAutoConnected(false);
+            alert("Could not communicate with the extension. Ensure it is loaded and your browser allows external messaging.");
           }
           setIsFetching(false);
         });
       } else {
-        // Mock fallback for testing UI
+        // Mock fallback for UI testing in dev environments
         setTimeout(() => {
           setLiveTabs([
             { id: '1', title: 'GitHub - TabFlow', url: 'https://github.com' },
@@ -84,26 +104,40 @@ const App: React.FC = () => {
           <div className="p-12 max-w-6xl mx-auto overflow-y-auto w-full custom-scrollbar">
             <header className="mb-12">
               <h2 className="text-5xl font-black text-white mb-4 tracking-tighter">System Setup</h2>
-              <p className="text-slate-500 text-lg">Download the extension and configure your bridge.</p>
+              <p className="text-slate-500 text-lg">The bridge is now automated. Just install and go.</p>
             </header>
             
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
               <div className="space-y-8">
                 <ExtensionDownloader />
                 
-                <div className="bg-[#161920] p-8 rounded-3xl border border-slate-800 shadow-2xl">
+                <div className={`bg-[#161920] p-8 rounded-3xl border transition-colors shadow-2xl ${isAutoConnected ? 'border-emerald-500/30' : 'border-slate-800'}`}>
                   <h3 className="text-xl font-bold text-white mb-6 flex items-center gap-3">
-                    <i className="fas fa-key text-blue-400"></i>
-                    Handshake Protocol
+                    <i className={`fas ${isAutoConnected ? 'fa-link text-emerald-400' : 'fa-link-slash text-slate-500'}`}></i>
+                    Connection Status
                   </h3>
-                  <p className="text-sm text-slate-400 mb-4">Paste your Extension ID from <code>chrome://extensions</code> after loading the unpacked folder.</p>
-                  <input 
-                    type="text"
-                    value={extensionId}
-                    onChange={(e) => setExtensionId(e.target.value)}
-                    placeholder="Enter extension ID..."
-                    className="w-full bg-[#0a0c10] border border-slate-700 rounded-xl px-4 py-3 text-white focus:border-blue-500 outline-none transition-all font-mono text-sm"
-                  />
+                  {isAutoConnected ? (
+                    <div className="bg-emerald-500/10 text-emerald-400 p-4 rounded-2xl flex items-center gap-4 text-sm font-bold border border-emerald-500/20">
+                      <i className="fas fa-check-circle"></i>
+                      Extension Detected & Linked Automatically
+                    </div>
+                  ) : (
+                    <div className="bg-slate-800/50 text-slate-400 p-4 rounded-2xl flex items-center gap-4 text-sm font-medium border border-slate-700">
+                      <i className="fas fa-hourglass-half animate-pulse"></i>
+                      Waiting for extension...
+                    </div>
+                  )}
+                  
+                  <div className="mt-8">
+                    <label className="text-[10px] uppercase font-black tracking-widest text-slate-500 mb-3 block">Extension Bridge ID</label>
+                    <input 
+                      type="text"
+                      value={extensionId}
+                      onChange={(e) => setExtensionId(e.target.value)}
+                      placeholder="Waiting for auto-detect..."
+                      className="w-full bg-[#0a0c10] border border-slate-700 rounded-xl px-4 py-3 text-white focus:border-blue-500 outline-none transition-all font-mono text-xs"
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -116,11 +150,11 @@ const App: React.FC = () => {
                       className="bg-slate-800 hover:bg-slate-700 text-white py-4 rounded-2xl font-bold transition-all flex flex-col items-center gap-2"
                     >
                       <i className="fas fa-file-export text-xl text-blue-400"></i>
-                      Export Data
+                      Export
                     </button>
                     <label className="bg-slate-800 hover:bg-slate-700 text-white py-4 rounded-2xl font-bold transition-all flex flex-col items-center gap-2 cursor-pointer">
                       <i className="fas fa-file-import text-xl text-emerald-400"></i>
-                      Restore Backup
+                      Restore
                       <input type="file" className="hidden" accept=".json" onChange={async (e) => {
                          const file = e.target.files?.[0];
                          if (file) {

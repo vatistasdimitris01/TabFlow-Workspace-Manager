@@ -13,6 +13,14 @@ const ExtensionDownloader: React.FC = () => {
 
       if (!folder) throw new Error("Could not create folder in ZIP");
 
+      const appMatches = [
+        "*://localhost/*",
+        "*://*.stackblitz.io/*",
+        "https://*.webcontainer.io/*",
+        "*://127.0.0.1/*",
+        window.location.origin + "/*"
+      ];
+
       // 1. manifest.json
       const manifest = {
         "manifest_version": 3,
@@ -21,20 +29,21 @@ const ExtensionDownloader: React.FC = () => {
         "description": "Professional Workspace Bridge for TabFlow.",
         "permissions": ["tabs", "storage"],
         "externally_connectable": {
-          "matches": [
-            "*://localhost/*",
-            "*://*.stackblitz.io/*",
-            "https://*.webcontainer.io/*",
-            "*://127.0.0.1/*",
-            window.location.origin + "/*"
-          ]
+          "matches": appMatches
         },
         "background": {
           "service_worker": "background.js"
         },
         "action": {
           "default_popup": "popup.html"
-        }
+        },
+        "content_scripts": [
+          {
+            "matches": appMatches,
+            "js": ["content_script.js"],
+            "run_at": "document_start"
+          }
+        ]
       };
       folder.file("manifest.json", JSON.stringify(manifest, null, 4));
 
@@ -58,7 +67,23 @@ chrome.runtime.onMessageExternal.addListener((request, sender, sendResponse) => 
       `;
       folder.file("background.js", backgroundJs);
 
-      // 3. popup.html
+      // 3. content_script.js (The Auto-Handshake Magic)
+      const contentScriptJs = `
+// Notify the web app of our presence and ID
+function notifyApp() {
+    window.postMessage({ 
+        type: "TABFLOW_EXTENSION_READY", 
+        extensionId: chrome.runtime.id 
+    }, "*");
+}
+
+// Send immediately and also on page load to ensure coverage
+notifyApp();
+window.addEventListener('load', notifyApp);
+      `;
+      folder.file("content_script.js", contentScriptJs);
+
+      // 4. popup.html (CSP Compliant)
       const popupHtml = `
 <!DOCTYPE html>
 <html>
@@ -83,18 +108,24 @@ chrome.runtime.onMessageExternal.addListener((request, sender, sendResponse) => 
             <h1>TabFlow Pro</h1>
             <div class="badge">Active</div>
         </div>
-        <p>Your browser is connected to the TabFlow Workspace. Drag, drop, and organize your tabs in real-time.</p>
-        <button class="btn" onclick="window.close()">Connected</button>
+        <p>Connected to workspace. Reorganize your browser tabs in real-time using the dashboard.</p>
+        <button class="btn" id="closeBtn">Connected</button>
     </div>
+    <script src="popup.js"></script>
 </body>
 </html>
       `;
       folder.file("popup.html", popupHtml);
 
-      // Generate the zip file
+      // 5. popup.js (CSP Compliant Event Handler)
+      const popupJs = `
+document.getElementById('closeBtn').addEventListener('click', () => {
+    window.close();
+});
+      `;
+      folder.file("popup.js", popupJs);
+
       const content = await zip.generateAsync({ type: "blob" });
-      
-      // Trigger download
       const url = URL.createObjectURL(content);
       const a = document.createElement('a');
       a.href = url;
@@ -105,7 +136,6 @@ chrome.runtime.onMessageExternal.addListener((request, sender, sendResponse) => 
       URL.revokeObjectURL(url);
     } catch (error) {
       console.error("Failed to generate extension zip:", error);
-      alert("Failed to generate extension bundle. Check console.");
     } finally {
       setIsGenerating(false);
     }
@@ -113,16 +143,15 @@ chrome.runtime.onMessageExternal.addListener((request, sender, sendResponse) => 
 
   return (
     <div className="bg-gradient-to-br from-blue-600 to-indigo-700 p-8 rounded-[2.5rem] shadow-2xl shadow-blue-500/20 text-white flex flex-col items-center text-center border border-white/10 relative overflow-hidden group">
-      {/* Visual background element */}
       <div className="absolute -top-24 -right-24 w-64 h-64 bg-white/10 rounded-full blur-3xl group-hover:bg-white/20 transition-all duration-700"></div>
       
       <div className="w-20 h-20 bg-white/20 rounded-3xl flex items-center justify-center text-4xl mb-6 backdrop-blur-xl border border-white/20 shadow-inner relative z-10">
-        <i className="fas fa-box-open"></i>
+        <i className="fas fa-magic"></i>
       </div>
       
-      <h3 className="text-3xl font-black mb-3 tracking-tighter relative z-10">Get the Extension</h3>
+      <h3 className="text-3xl font-black mb-3 tracking-tighter relative z-10">Instant Setup</h3>
       <p className="text-blue-100 mb-10 max-w-sm text-sm font-medium relative z-10">
-        Download the ready-to-load extension folder to enable real-time tab syncing between your browser and this workspace.
+        Download the new 2025 Auto-Connect bundle. It links automatically to this app upon installation.
       </p>
       
       <div className="space-y-4 w-full relative z-10">
@@ -131,26 +160,18 @@ chrome.runtime.onMessageExternal.addListener((request, sender, sendResponse) => 
           disabled={isGenerating}
           className="w-full bg-white text-blue-700 py-5 rounded-[1.5rem] font-black text-xs uppercase tracking-[0.2em] hover:bg-blue-50 transition-all transform hover:scale-[1.02] active:scale-95 shadow-2xl disabled:opacity-50"
         >
-          {isGenerating ? 'Packaging Bundle...' : '1. Download Extension (ZIP)'}
+          {isGenerating ? 'Packaging...' : 'Download Auto-Link Extension'}
         </button>
         
         <div className="text-left text-[10px] text-blue-100 bg-black/20 backdrop-blur-md p-6 rounded-3xl space-y-3 border border-white/5">
-          <p className="font-black text-white uppercase tracking-widest text-[9px] mb-2 opacity-60">Installation Guide</p>
+          <p className="font-black text-white uppercase tracking-widest text-[9px] mb-2 opacity-60">No Handshake Required</p>
+          <div className="flex gap-3">
+            <span className="w-5 h-5 bg-white/10 rounded flex items-center justify-center font-bold">1</span>
+            <p>Extract zip and load in <code>chrome://extensions</code></p>
+          </div>
           <div className="flex gap-3">
             <span className="w-5 h-5 bg-white/10 rounded flex items-center justify-center font-bold">2</span>
-            <p>Extract the <strong>tabflow_pro_extension.zip</strong> file to a folder.</p>
-          </div>
-          <div className="flex gap-3">
-            <span className="w-5 h-5 bg-white/10 rounded flex items-center justify-center font-bold">3</span>
-            <p>Go to <code>chrome://extensions</code> and toggle <strong>Developer Mode</strong> (top right).</p>
-          </div>
-          <div className="flex gap-3">
-            <span className="w-5 h-5 bg-white/10 rounded flex items-center justify-center font-bold">4</span>
-            <p>Click <strong>Load Unpacked</strong> and select the extracted folder.</p>
-          </div>
-          <div className="flex gap-3">
-            <span className="w-5 h-5 bg-white/10 rounded flex items-center justify-center font-bold">5</span>
-            <p>Copy the <strong>Extension ID</strong> and paste it in the Handshake field below.</p>
+            <p>Once loaded, this app will instantly detect the connection.</p>
           </div>
         </div>
       </div>
