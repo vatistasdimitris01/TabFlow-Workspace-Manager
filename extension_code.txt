@@ -1,7 +1,7 @@
 
 # ==============================================================================
-# TABFLOW EXTENSION BUILDER SCRIPT (v2.0 - CONNECTED WORKSPACE)
-# This script generates the full extension with Web-App communication enabled.
+# TABFLOW PRO: THE FULL BUILD SCRIPT
+# Run this script using 'python build_extension.py' to generate your extension.
 # ==============================================================================
 
 import os
@@ -13,138 +13,96 @@ def create_extension_project():
     os.makedirs(project_name, exist_ok=True)
     os.makedirs(os.path.join(project_name, "icons"), exist_ok=True)
 
-    # 1. manifest.json (Updated with Externally Connectable)
+    # 1. Manifest
     manifest = {
         "manifest_version": 3,
-        "name": "TabFlow Pro Workspace",
+        "name": "TabFlow Pro",
         "version": "1.0",
-        "description": "Bridge between browser tabs and the TabFlow Workspace app.",
-        "permissions": ["tabs", "storage", "nativeMessaging", "tabGroups"],
+        "description": "Professional Workspace Bridge for TabFlow.",
+        "permissions": ["tabs", "storage", "nativeMessaging"],
         "externally_connectable": {
-            "matches": ["*://localhost/*", "*://*.stackblitz.io/*", "http://127.0.0.1/*"]
+            "matches": [
+                "*://localhost/*",
+                "*://*.stackblitz.io/*",
+                "https://*.webcontainer.io/*",
+                "*://127.0.0.1/*"
+            ]
         },
-        "background": {
-            "service_worker": "background.js"
-        },
-        "action": {
-            "default_popup": "popup.html"
-        }
+        "background": { "service_worker": "background.js" },
+        "action": { "default_popup": "popup.html" }
     }
     with open(os.path.join(project_name, "manifest.json"), "w") as f:
         json.dump(manifest, f, indent=4)
 
-    # 2. native_host.py (Enhanced Logic)
-    native_host_content = r'''#!/usr/bin/env python3
-import sys, struct, json, os, time
-from urllib.parse import urlparse
-
-def get_message():
-    raw_length = sys.stdin.buffer.read(4)
-    if not raw_length: sys.exit(0)
-    msg_len = struct.unpack('@I', raw_length)[0]
-    return json.loads(sys.stdin.buffer.read(msg_len).decode('utf-8'))
-
-def send_message(content):
-    res = json.dumps(content).encode('utf-8')
-    sys.stdout.buffer.write(struct.pack('@I', len(res)))
-    sys.stdout.buffer.write(res)
-    sys.stdout.buffer.flush()
-
-def main():
-    while True:
-        try:
-            msg = get_message()
-            action = msg.get("action")
-            if action == "ping":
-                send_message({"status": "connected", "v": "2.0"})
-            elif action == "analyze":
-                tabs = msg.get("tabs", [])
-                send_message({"status": "ok", "tab_count": len(tabs)})
-        except: break
-
-if __name__ == "__main__": main()
-'''
-    host_path = os.path.join(project_name, "native_host.py")
-    with open(host_path, "w") as f: f.write(native_host_content)
-    os.chmod(host_path, os.stat(host_path).st_mode | stat.S_IEXEC)
-
-    # 3. background.js (Messenger Hub)
-    background_js = r'''
+    # 2. Background Script
+    bg_js = r'''
 chrome.runtime.onMessageExternal.addListener((request, sender, sendResponse) => {
     if (request.type === "GET_TABS") {
         chrome.tabs.query({}, (tabs) => {
-            sendResponse({ tabs: tabs.map(t => ({
-                id: t.id.toString(),
-                title: t.title,
-                url: t.url,
-                favIconUrl: t.favIconUrl
-            })) });
+            sendResponse({ 
+                tabs: tabs.map(t => ({
+                    id: t.id.toString(),
+                    title: t.title,
+                    url: t.url,
+                    favIconUrl: t.favIconUrl
+                })) 
+            });
         });
-        return true; // async
-    }
-});
-
-chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-    if (msg.type === "POPUP_TABS") {
-        chrome.tabs.query({}, (tabs) => sendResponse({count: tabs.length}));
-        return true;
+        return true; 
     }
 });
 '''
-    with open(os.path.join(project_name, "background.js"), "w") as f: f.write(background_js)
+    with open(os.path.join(project_name, "background.js"), "w") as f:
+        f.write(bg_js)
 
-    # 4. popup.html (Modern Design)
+    # 3. Popup HTML (Glassmorphism)
     popup_html = r'''
 <!DOCTYPE html>
 <html>
 <head>
     <style>
-        body { width: 320px; font-family: 'Inter', sans-serif; background: #0f172a; color: white; margin: 0; overflow: hidden; }
-        .container { padding: 24px; background: linear-gradient(180deg, rgba(30,41,59,1) 0%, rgba(15,23,42,1) 100%); }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
+        body { width: 320px; font-family: 'Inter', sans-serif; background: #020617; color: white; margin: 0; padding: 24px; }
+        .glass { background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 24px; padding: 24px; backdrop-filter: blur(10px); }
         .header { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; }
-        .logo { width: 32px; height: 32px; background: #3b82f6; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: bold; }
-        h1 { font-size: 16px; margin: 0; letter-spacing: -0.5px; }
-        .stat-card { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; padding: 16px; margin-bottom: 20px; }
-        .stat-label { font-size: 10px; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; font-weight: 700; margin-bottom: 4px; }
-        .stat-value { font-size: 24px; font-weight: 800; }
-        .btn { width: 100%; padding: 12px; border-radius: 12px; border: none; font-weight: 700; cursor: pointer; transition: 0.2s; }
-        .btn-primary { background: #3b82f6; color: white; box-shadow: 0 4px 12px rgba(59,130,246,0.3); }
-        .btn-primary:hover { background: #2563eb; transform: translateY(-1px); }
-        .footer { font-size: 10px; color: #475569; text-align: center; margin-top: 16px; }
+        .logo { width: 32px; height: 32px; background: #3b82f6; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-weight: 900; }
+        h1 { font-size: 18px; margin: 0; font-weight: 900; letter-spacing: -0.5px; }
+        p { color: #94a3b8; font-size: 12px; line-height: 1.5; margin: 0 0 20px 0; }
+        .btn { background: #3b82f6; color: white; border: none; width: 100%; padding: 14px; border-radius: 14px; font-weight: 700; cursor: pointer; transition: all 0.2s; box-shadow: 0 8px 16px rgba(59, 130, 246, 0.2); }
+        .btn:hover { background: #2563eb; transform: translateY(-1px); }
+        .badge { background: #10b981; color: white; font-size: 8px; font-weight: 900; padding: 4px 8px; border-radius: 6px; text-transform: uppercase; }
     </style>
 </head>
 <body>
-    <div class="container">
+    <div class="glass">
         <div class="header">
             <div class="logo">T</div>
             <h1>TabFlow Pro</h1>
+            <div class="badge">Live</div>
         </div>
-        <div class="stat-card">
-            <div class="stat-label">Active Tabs</div>
-            <div id="tab-count" class="stat-value">--</div>
-        </div>
-        <button class="btn btn-primary" id="open-workspace">Open Workspace</button>
-        <div class="footer">Workspace Sync: Connected</div>
+        <p>Syncing your workspace in real-time. Gather, group, and conquer tab hoarding.</p>
+        <button class="btn" onclick="chrome.tabs.create({url:'http://localhost:5173'})">Open Dashboard</button>
     </div>
-    <script src="popup.js"></script>
 </body>
 </html>
 '''
-    with open(os.path.join(project_name, "popup.html"), "w") as f: f.write(popup_html)
+    with open(os.path.join(project_name, "popup.html"), "w") as f:
+        f.write(popup_html)
 
-    # 5. popup.js
-    popup_js = r'''
-chrome.runtime.sendMessage({type: "POPUP_TABS"}, (response) => {
-    if (response) document.getElementById('tab-count').innerText = response.count;
-});
+    # 4. Native Host Manifest (Optional logic bridge)
+    nm_manifest = {
+        "name": "com.tabflow.host",
+        "description": "TabFlow Python Bridge",
+        "path": os.path.abspath(os.path.join(project_name, "native_host.py")),
+        "type": "stdio",
+        "allowed_origins": ["chrome-extension://ENTER_YOUR_ID_HERE/"]
+    }
+    with open(os.path.join(project_name, "com.tabflow.host.json"), "w") as f:
+        json.dump(nm_manifest, f, indent=4)
 
-document.getElementById('open-workspace').addEventListener('click', () => {
-    chrome.tabs.create({url: "http://localhost:5173"}); // Update to your app URL
-});
-'''
-    with open(os.path.join(project_name, "popup.js"), "w") as f: f.write(popup_js)
-
-    print(f"🚀 TabFlow Pro Extension Generated in ./{project_name}")
+    print(f"✅ Success! Build complete.")
+    print(f"👉 Project Path: ./{project_name}")
+    print(f"👉 Setup: Load this folder in chrome://extensions")
 
 if __name__ == "__main__":
     create_extension_project()
